@@ -128,17 +128,28 @@ public class AssetGenerationMojo extends AbstractMojo {
             getLog().debug("Index File: " + indexFile.toString());
             getLog().debug("Asset Id: " + this.assetId);
 
+            // Create index file data
             JsonObject index = new JsonObject();
             index.addProperty("id", this.assetId);
             index.addProperty("generated", DATE_FORMAT.format(new Date()));
             index.addProperty("basedir", this.dataDir);
             index.add("assets", this.assets);
 
+            // Write index to disk
             try (FileWriter writer = new FileWriter(indexFile) ) {
                 Gson gson = new GsonBuilder().setPrettyPrinting().create();
                 gson.toJson(index, writer);
             }
 
+            // Write hash file for index
+            HashCode hashCode = Files.hash(indexFile, getHashMethod());
+            String hash = BaseEncoding.base16().encode(hashCode.asBytes());
+
+            try (FileWriter writer = new FileWriter(new File(indexFile + "." + this.hashMethod))) {
+                writer.write(hash);
+            }
+
+            // Create zip of assets
             File destFile = new File(buildDirectory, project.getArtifactId() + "-" + project.getVersion() + "-assets.zip");
             getLog().info("Zipping assets");
             getLog().debug("Zip File: " + destFile.toString());
