@@ -19,12 +19,12 @@ package uk.co.thefishlive;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
+import com.google.common.io.BaseEncoding;
 import com.google.common.io.Files;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.sun.org.apache.xerces.internal.impl.dv.util.HexBin;
 import org.apache.maven.model.Resource;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -36,11 +36,8 @@ import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.MavenProjectHelper;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -49,7 +46,6 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -61,12 +57,7 @@ import java.util.zip.ZipOutputStream;
 public class AssetGenerationMojo extends AbstractMojo {
 
     private static final Pattern REPLACE_SEPARATOR = Pattern.compile(File.separator, Pattern.LITERAL);
-
-    /**
-     * Location of the file.
-     */
-    @Parameter( defaultValue = "${project.build.directory}/assets/", property = "outputDir", required = true )
-    private File outputDirectory;
+    public static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
 
     /**
      * The hash method to use on the files.
@@ -75,10 +66,22 @@ public class AssetGenerationMojo extends AbstractMojo {
     private String hashMethod;
 
     /**
+     * The id to save the assets under
+     */
+    @Parameter( defaultValue = "${project.artifactId}-${project.version}", property = "assetId", required = true)
+    private String assetId;
+
+    /**
      * The sub directory to store the assets in
      */
     @Parameter( defaultValue = "data", property = "dataDir", required = true )
     private String dataDir;
+
+    /**
+     * Location of the file.
+     */
+    @Parameter( defaultValue = "${project.build.directory}/assets/", property = "outputDir", required = true )
+    private File outputDirectory;
 
     /**
      * Location of the build directory
@@ -96,6 +99,7 @@ public class AssetGenerationMojo extends AbstractMojo {
 
     public void execute() throws MojoExecutionException {
         List resources = project.getResources();
+        getLog().info("Generating assets for project " + project.getName());
 
         if (outputDirectory.exists()) {
             try {
@@ -109,6 +113,8 @@ public class AssetGenerationMojo extends AbstractMojo {
             Resource resource = (Resource) object;
 
             File dir = new File(resource.getDirectory());
+            getLog().info("Processing directory: " + dir.toString());
+
             try {
                 processDir(dir.listFiles(), dir);
             } catch (IOException e) {
@@ -116,19 +122,26 @@ public class AssetGenerationMojo extends AbstractMojo {
             }
         }
 
-        try{
+        try {
+            File indexFile = new File(this.outputDirectory, "index.json");
+            getLog().info("Generating index file");
+            getLog().debug("Index File: " + indexFile.toString());
+            getLog().debug("Asset Id: " + this.assetId);
+
             JsonObject index = new JsonObject();
-            index.addProperty("id", project.getArtifactId() + "-" + project.getVersion());
-            index.addProperty("generated", new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ").format(new Date()));
+            index.addProperty("id", this.assetId);
+            index.addProperty("generated", DATE_FORMAT.format(new Date()));
             index.addProperty("basedir", this.dataDir);
             index.add("assets", this.assets);
 
-            try (FileWriter writer = new FileWriter(new File(this.outputDirectory, "index.json")) ) {
+            try (FileWriter writer = new FileWriter(indexFile) ) {
                 Gson gson = new GsonBuilder().setPrettyPrinting().create();
                 gson.toJson(index, writer);
             }
 
             File destFile = new File(buildDirectory, project.getArtifactId() + "-" + project.getVersion() + "-assets.zip");
+            getLog().info("Zipping assets");
+            getLog().debug("Zip File: " + destFile.toString());
             createZip(outputDirectory, destFile);
             projectHelper.attachArtifact(project, destFile, "assets");
         } catch (IOException e) {
@@ -148,7 +161,7 @@ public class AssetGenerationMojo extends AbstractMojo {
 
             // Create the hash code for this file
             HashCode hashCode = Files.hash(cur, getHashMethod());
-            String hash = HexBin.encode(hashCode.asBytes());
+            String hash = BaseEncoding.base16().encode(hashCode.asBytes());
             getLog().debug(hash);
 
             assert hash != null; // Not sure if this can be null, but the warning was annoying me
@@ -170,7 +183,7 @@ public class AssetGenerationMojo extends AbstractMojo {
             json.addProperty("hash", hash);
             assets.add(json);
 
-            getLog().info(json.toString());
+            getLog().debug(json.toString());
             getLog().debug("");
         }
     }
@@ -227,11 +240,13 @@ public class AssetGenerationMojo extends AbstractMojo {
             java.nio.file.Files.walkFileTree(dir.toPath(), new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                    getLog().info(file.toString());
+                    getLog().debug(file.toString());
+
                     output.putNextEntry(new ZipEntry(file.toString().substring(dir.getAbsolutePath().length() + 1)));
                     Files.copy(file.toFile(), output);
                     output.flush();
                     output.closeEntry();
+
                     return FileVisitResult.CONTINUE;
                 }
             });
