@@ -175,19 +175,23 @@ public class AssetGenerationMojo extends AbstractMojo {
             String hash = BaseEncoding.base16().encode(hashCode.asBytes());
             getLog().debug(hash);
 
+            String path = cur.getAbsolutePath().substring(basedir.getAbsolutePath().length() + 1);
+            Matcher matcher = REPLACE_SEPARATOR.matcher(path);
+            path = matcher.replaceAll("/");
+
             assert hash != null; // Not sure if this can be null, but the warning was annoying me
             File output = new File(outputDirectory, this.dataDir + File.separator + hash.substring(0, 1) + File.separator +  hash.substring(1, 2) + File.separator + hash);
             getLog().debug(output.toString());
 
             // Make sure file exists to write to
             if (!output.getParentFile().exists() && !output.getParentFile().mkdirs()) throw new IOException("Could not create parent file (" + output.getParent() + ")");
-            if (!output.createNewFile()) throw new IOException("Could not create (" + output + ")");
 
-            Files.copy(cur, output);
-
-            String path = cur.getAbsolutePath().substring(basedir.getAbsolutePath().length() + 1);
-            Matcher matcher = REPLACE_SEPARATOR.matcher(path);
-            path = matcher.replaceAll("/");
+            if (output.exists()) {
+                getLog().info(String.format("Asset for %s already exists %s, are they the same file?", path, hash));
+            } else {
+                if (!output.createNewFile()) throw new IOException("Could not create (" + output + ")");
+                Files.copy(cur, output);
+            }
 
             JsonObject json = new JsonObject();
             json.addProperty("path", path);
