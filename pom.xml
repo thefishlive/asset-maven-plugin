@@ -16,7 +16,7 @@
 
     <scm>
         <url>https://github.com/thefishlive/asset-maven-plugin</url>
-        <developerConnection>https://github.com/thefishlive/asset-maven-plugin.git</developerConnection>
+        <developerConnection>scm:git:https://github.com/thefishlive/asset-maven-plugin.git</developerConnection>
     </scm>
 
     <distributionManagement>
