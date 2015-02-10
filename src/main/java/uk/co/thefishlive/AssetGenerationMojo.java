@@ -154,7 +154,9 @@ public class AssetGenerationMojo extends AbstractMojo {
             getLog().info("Zipping assets");
             getLog().debug("Zip File: " + destFile.toString());
             createZip(outputDirectory, destFile);
-            projectHelper.attachArtifact(project, destFile, "assets");
+
+            projectHelper.attachArtifact(project, "zip", "assets", destFile);
+            projectHelper.attachArtifact(project, "json", "assets-index", indexFile);
         } catch (IOException e) {
             throw new MojoExecutionException("Error creating index", e);
         }
