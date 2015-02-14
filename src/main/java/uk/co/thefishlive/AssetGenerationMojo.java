@@ -1,21 +1,5 @@
 package uk.co.thefishlive;
 
-/*
- * Copyright 2001-2005 The Apache Software Foundation.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 import com.google.common.hash.HashCode;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
@@ -26,7 +10,6 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.apache.maven.model.Resource;
-import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 
 import org.apache.maven.plugins.annotations.Component;
@@ -54,34 +37,10 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 @Mojo( name = "generate-assets", defaultPhase = LifecyclePhase.GENERATE_RESOURCES )
-public class AssetGenerationMojo extends AbstractMojo {
+public class AssetGenerationMojo extends AbstractAssetMojo {
 
     private static final Pattern REPLACE_SEPARATOR = Pattern.compile(File.separator, Pattern.LITERAL);
     public static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
-
-    /**
-     * The hash method to use on the files.
-     */
-    @Parameter( defaultValue = "sha1", property = "hashMethod", required = true)
-    private String hashMethod;
-
-    /**
-     * The id to save the assets under
-     */
-    @Parameter( defaultValue = "${project.artifactId}-${project.version}", property = "assetId", required = true)
-    private String assetId;
-
-    /**
-     * The sub directory to store the assets in
-     */
-    @Parameter( defaultValue = "data", property = "dataDir", required = true )
-    private String dataDir;
-
-    /**
-     * Location of the file.
-     */
-    @Parameter( defaultValue = "${project.build.directory}/assets/", property = "outputDir", required = true )
-    private File outputDirectory;
 
     /**
      * Location of the build directory
@@ -205,50 +164,6 @@ public class AssetGenerationMojo extends AbstractMojo {
         }
     }
 
-    public HashFunction getHashMethod() {
-        switch (this.hashMethod) {
-            case "md5":
-                return Hashing.md5();
-            case "sha256":
-                return Hashing.sha256();
-            case "sha512":
-                return Hashing.sha512();
-            case "sha1":
-            default:
-                return Hashing.sha1();
-        }
-    }
-
-    public static void removeRecursive(Path path) throws IOException {
-        java.nio.file.Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
-            @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                java.nio.file.Files.delete(file);
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
-                // try to delete the file anyway, even if its attributes
-                // could not be read, since delete-only access is
-                // theoretically possible
-                java.nio.file.Files.delete(file);
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-                if (exc == null) {
-                    java.nio.file.Files.delete(dir);
-                    return FileVisitResult.CONTINUE;
-                } else {
-                    // directory iteration failed; propagate exception
-                    throw exc;
-                }
-            }
-        });
-    }
-
     public void createZip(final File dir, File destFile) throws IOException {
         if (destFile.exists() && !destFile.delete()) throw new IOException("Could not delete destination file");
         FileOutputStream dest = new FileOutputStream(destFile);
@@ -269,5 +184,4 @@ public class AssetGenerationMojo extends AbstractMojo {
             });
         }
     }
-
 }
